@@ -25,6 +25,14 @@ typedef struct
 	char name[32];
 } Client;
 
+typedef struct 
+{
+	Client listClient[MAX_CLIENTS];
+	int gid;
+} Group;
+
+Group *groups[MAX_CLIENTS];
+
 Client *clients[MAX_CLIENTS];
 pthread_mutex_t clientsMutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -93,7 +101,7 @@ void queueRemove(int uid)
  * @param s message to send
  * @param uid user id
  */
-void sendMessage(char *s, int uid)
+void sendMessage(char *s, int uid, int gid)
 {
 	pthread_mutex_lock(&clientsMutex);
 
@@ -140,7 +148,7 @@ void *handleClient(void *arg)
 		strcpy(cli->name, name);
 		sprintf(buff_out, "%s has joined\n", cli->name);
 		printf("%s", buff_out);
-		sendMessage(buff_out, cli->uid);
+		sendMessage(buff_out, cli->uid, 0);
 	}
 
 	bzero(buff_out, BUFFER_SIZE);
@@ -157,7 +165,7 @@ void *handleClient(void *arg)
 		{
 			if (strlen(buff_out) > 0)
 			{
-				sendMessage(buff_out, cli->uid);
+				sendMessage(buff_out, cli->uid, 0);
 
 				strTrimLf(buff_out, strlen(buff_out));
 				printf("%s -> %s\n", buff_out, cli->name);
@@ -167,7 +175,7 @@ void *handleClient(void *arg)
 		{
 			sprintf(buff_out, "%s has left\n", cli->name);
 			printf("%s", buff_out);
-			sendMessage(buff_out, cli->uid);
+			sendMessage(buff_out, cli->uid, 0);
 			leave_flag = 1;
 		}
 		else
