@@ -29,7 +29,6 @@
 volatile sig_atomic_t flag = 0;
 int sockfd = 0;
 char name[MSG_BUFFER];
-char password[MSG_BUFFER];
 char *commands[CMD_COUNT] = {CHAT_CMD, FILE_CMD, MENU_CMD, EXIT_CMD};
 
 /**
@@ -148,6 +147,61 @@ void receiveMsgHandler()
 }
 
 /**
+ * Handles the user authentication with the server
+ */
+void loginHandler()
+{
+	char password[MSG_BUFFER];
+
+	// User name input
+	while (flag == 0)
+	{
+		printf("Please enter your name: ");
+		fgets(name, MSG_BUFFER, stdin);
+		strTrimAll(name, strlen(name));
+
+		// Validate name size
+		if (strlen(name) > MSG_BUFFER || strlen(name) < 2)
+		{
+			console.error("Name must be less than 30 and more than 2 characters");
+			continue;
+		}
+
+		break;
+	}
+
+	// User password input
+	while (flag == 0)
+	{
+		printf("Please enter your password: ");
+		fgets(password, MSG_BUFFER, stdin);
+		strTrimAll(password, strlen(password));
+
+		// Validate password size
+		if (strlen(password) > MSG_BUFFER || strlen(password) < 2)
+		{
+			console.error("Password must be less than 30 and more than 2 characters");
+			continue;
+		}
+
+		break;
+	}
+
+	// Serve validation
+	if (logIn(name, password, sockfd) == 1)
+	{
+		console.log("User logged in successfully");
+	}
+	else
+	{
+		console.error("Sever authentication failed");
+		loginHandler();
+	}
+
+	bzero(password, MSG_BUFFER);
+}
+
+/**
  * Main program cycle
  */
 void start()
@@ -160,42 +214,23 @@ void start()
 
 int main(int argc, char **argv)
 {
+	// Port in use
 	if (argc != 2)
 	{
-		printf("Usage: %s <port>\n", argv[0]);
+		char errorMsg[48];
+		sprintf(errorMsg, "Port already in use: %s <port>\n", argv[0]);
+		console.error(errorMsg);
 		return EXIT_FAILURE;
 	}
 
-	char *ip = "127.0.0.1";
-	int port = atoi(argv[1]);
-
+	// Subscribes the exit on command signal
 	signal(SIGINT, exitOnCommand);
 
-	// User name input
-	printf("Please enter your name: ");
-	fgets(name, MSG_BUFFER, stdin);
-	strTrimAll(name, strlen(name));
-
-	if (strlen(name) > MSG_BUFFER || strlen(name) < 2)
-	{
-		console.error("Name must be less than 30 and more than 2 characters");
-		return EXIT_FAILURE;
-	}
-
-	// User password input
-	printf("Please enter your password: ");
-	fgets(password, MSG_BUFFER, stdin);
-	strTrimAll(password, strlen(password));
-
-	if (strlen(password) > MSG_BUFFER || strlen(password) < 2)
-	{
-		console.error("Password must be less than 30 and more than 2 characters");
-		return EXIT_FAILURE;
-	}
-
+	// Socket settings
+	char *ip = "127.0.0.1";
+	int port = atoi(argv[1]);
 	struct sockaddr_in server_addr;
 
-	// Socket settings
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_addr.s_addr = inet_addr(ip);
@@ -205,18 +240,16 @@ int main(int argc, char **argv)
 	int err = connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr));
 	if (err == -1)
 	{
-		console.error("Connection failed");
+		console.error("Connection to server failed");
 		return EXIT_FAILURE;
 	}
 
-	// Send message
-	char message[64];
-	memcpy(message, name, MSG_BUFFER);
-	memcpy(message + MSG_BUFFER, password, MSG_BUFFER);
-	send(sockfd, message, 64, 0);
+	// Authenticate user
+	loginHandler();
 
 	printf("=== WELCOME TO THE CHATROOM ===\n");
 
+	// Start main program thread
 	pthread_t send_msg_thread;
 	if (pthread_create(&send_msg_thread, NULL, (void *)start, NULL) != 0)
 	{
@@ -224,6 +257,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
+	// Start listening server thread
 	pthread_t recv_msg_thread;
 	if (pthread_create(&recv_msg_thread, NULL, (void *)receiveMsgHandler, NULL) != 0)
 	{

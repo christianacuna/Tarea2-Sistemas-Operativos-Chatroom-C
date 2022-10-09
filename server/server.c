@@ -17,8 +17,12 @@
 #define BUFFER_SIZE 2048
 #define MSG_BUFFER 32
 
+#define SEVER_OK "200"
+#define SEVER_ERROR "500"
+
 static _Atomic unsigned int clientCount = 0;
 static int uid = 10;
+int leave_flag = 0;
 
 /* Client structure */
 typedef struct
@@ -241,10 +245,10 @@ void sendMessage(char *s, int uid, int gid)
  * Validates the user information with the Authenticator
  *
  * @param message buffered message received
- * @param username reference
- * @param leave_flag flag to trigger a server exit
+ * @param name username to validate
+ * @param sockfd socket file descriptor
  */
-int isValidClient(char message[MSG_BUFFER * 2], char name[MSG_BUFFER])
+int validateClient(char message[MSG_BUFFER * 2], char name[MSG_BUFFER], int sockfd)
 {
 	int isValid = 0;
 	char password[MSG_BUFFER];
@@ -263,11 +267,22 @@ int isValidClient(char message[MSG_BUFFER * 2], char name[MSG_BUFFER])
 	}
 	else
 	{
+
+		char *response = malloc(sizeof(char) * MSG_BUFFER);
 		isValid = authenticate(name, password);
-		if (isValid == 0)
+		if (isValid == 1)
 		{
+			sprintf(response, "%s", SEVER_OK);
+			write(sockfd, response, MSG_BUFFER);
+			bzero(response, MSG_BUFFER);
+		}
+		else
+		{
+			sprintf(response, "%s", SEVER_ERROR);
+			write(sockfd, response, MSG_BUFFER);
 			console.error("Authentication failed, wrong password or username");
 		}
+		free(response);
 	}
 
 	return isValid;
@@ -278,39 +293,11 @@ int isValidClient(char message[MSG_BUFFER * 2], char name[MSG_BUFFER])
  *
  * @param arg Client reference
  */
-void *handleClient(void *arg)
+void *clientListener(Client *cli)
 {
 	char buff_out[BUFFER_SIZE];
-	char message[MSG_BUFFER * 2];
-	char name[MSG_BUFFER];
-	int leave_flag = 0;
 
 	clientCount++;
-	Client *cli = (Client *)arg;
-
-	// Read message
-	int result = recv(cli->sockfd, message, MSG_BUFFER * 2, 0) <= 0;
-	if (result)
-	{
-		console.error("Invalid user buffered data");
-		leave_flag = 1;
-	}
-	else
-	{
-		if (isValidClient(message, name) == 1)
-		{
-			strcpy(cli->name, name);
-			sprintf(buff_out, "%s has joined\n", cli->name);
-			console.log(buff_out);
-			sendMessage(buff_out, cli->uid, 0);
-		}
-		else
-		{
-			leave_flag = 1;
-		}
-	}
-
-	bzero(buff_out, BUFFER_SIZE);
 
 	while (1)
 	{
@@ -332,7 +319,7 @@ void *handleClient(void *arg)
 		}
 		else if (receive == 0 || strcmp(buff_out, "exit") == 0)
 		{
-			sprintf(buff_out, "%s has left\n", cli->name);
+			sprintf(buff_out, "%s has left", cli->name);
 			console.log(buff_out);
 			sendMessage(buff_out, cli->uid, 0);
 			leave_flag = 1;
@@ -354,6 +341,52 @@ void *handleClient(void *arg)
 	pthread_detach(pthread_self());
 
 	return NULL;
+}
+
+/**
+ * Handler to wait until client successfully gets authenticated
+ *
+ * @param arg Client reference
+ */
+void *newClientHandler(void *arg)
+{
+	char buff_out[BUFFER_SIZE];
+	char message[MSG_BUFFER * 2];
+	char name[MSG_BUFFER];
+	Client *cli = (Client *)arg;
+
+	// Authenticate user
+	int isNotAuthenticated = 1;
+	while (isNotAuthenticated)
+	{
+		if (leave_flag)
+		{
+			break;
+		}
+
+		// Read message
+		int result = recv(cli->sockfd, message, MSG_BUFFER * 2, 0) <= 0;
+		if (result)
+		{
+			console.error("Invalid user buffered data");
+			leave_flag = 1;
+		}
+
+		// Authenticated correctly
+		if (validateClient(message, name, cli->sockfd) == 1)
+		{
+			isNotAuthenticated = 0;
+			strcpy(cli->name, name);
+			sprintf(buff_out, "%s has joined", cli->name);
+			console.log(buff_out);
+			bzero(buff_out, BUFFER_SIZE);
+		}
+		bzero(message, MSG_BUFFER * 2);
+		bzero(name, MSG_BUFFER);
+	}
+
+	// Passes priority to the listener handler
+	return clientListener(cli);
 }
 
 int main(int argc, char **argv)
@@ -426,7 +459,7 @@ int main(int argc, char **argv)
 
 		/* Add client to the queue and fork thread */
 		queueAdd(cli);
-		pthread_create(&threadId, NULL, &handleClient, (void *)cli);
+		pthread_create(&threadId, NULL, &newClientHandler, (void *)cli);
 
 		/* Reduce CPU usage */
 		sleep(1);
