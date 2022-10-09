@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
@@ -7,17 +8,29 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include "message_manager.c"
+#include "../util/file_manager.c"
 #include "../util/stringy.c"
 #include "../util/debugger.h"
 
-#define LENGTH 2048
+// Message constants
+#define CMD_LENGTH 64
+#define MSG_LENGTH 2048
 #define MSG_BUFFER 32
+
+// User commands
+#define EXIT_CMD "/exit"
+#define MENU_CMD "/menu"
+#define CHAT_CMD "/chat"
+#define FILE_CMD "/file"
+#define CMD_COUNT 4 // Update this base on the number of commands
 
 // Global variables
 volatile sig_atomic_t flag = 0;
 int sockfd = 0;
 char name[MSG_BUFFER];
 char password[MSG_BUFFER];
+char *commands[CMD_COUNT] = {CHAT_CMD, FILE_CMD, MENU_CMD, EXIT_CMD};
 
 /**
  * Used for Ctrl + C exit command
@@ -30,33 +43,82 @@ void exitOnCommand(int sig)
 }
 
 /**
- * Handler that sends the message to the Server
+ * Handler that waits for any user input
+ *
+ * @param input
+ * @param length user input expected length
+ */
+void userInputHandler(char *input, int length)
+{
+	strOverwriteStdout();
+	fgets(input, length, stdin);
+	strTrimLf(input, length);
+}
+
+/**
+ * Handler that waits for user text message
  */
 void sendMsgHandler()
 {
-	char message[LENGTH] = {};
-	char buffer[LENGTH + MSG_BUFFER + 2] = {};
+	char message[MSG_LENGTH];
+	printf("Please input a group or user name:\n");
+	userInputHandler(message, MSG_LENGTH);
+	sendMsg(name, message, MSG_LENGTH, sockfd);
+	bzero(message, MSG_LENGTH);
+}
 
-	while (1)
+/**
+ * Handler that waits for user file to send
+ */
+void sendFileHandler()
+{
+	FILE *fp = openFile("../README.md");
+	sendFile(fp, sockfd);
+	console.log("File data sent successfully");
+}
+
+/**
+ * Handler that waits for user commands
+ */
+void userCmdHandler()
+{
+	char command[CMD_LENGTH];
+	printf("Please input a command:\n");
+	// Prints the commands list
+	for (int i = 0; i < CMD_COUNT; i++)
 	{
-		strOverwriteStdout();
-		fgets(message, LENGTH, stdin);
-		strTrimLf(message, LENGTH);
-
-		if (strcmp(message, "exit") == 0)
-		{
-			break;
-		}
-		else
-		{
-			sprintf(buffer, "%s: %s\n", name, message);
-			send(sockfd, buffer, strlen(buffer), 0);
-		}
-
-		bzero(message, LENGTH);
-		bzero(buffer, LENGTH + MSG_BUFFER);
+		printf("%s\n", commands[i]);
 	}
-	exitOnCommand(2);
+	// Waits for user input
+	userInputHandler(command, CMD_LENGTH);
+	// Switch statement
+	if (strcmp(command, EXIT_CMD) == 0)
+	{
+		console.log("User exiting...");
+		bzero(command, CMD_LENGTH);
+		exitOnCommand(2);
+	}
+	else if (strcmp(command, MENU_CMD) == 0)
+	{
+		console.log("Returning to menu...");
+		bzero(command, CMD_LENGTH);
+	}
+	else if (strcmp(command, CHAT_CMD) == 0)
+	{
+		bzero(command, CMD_LENGTH);
+		sendMsgHandler();
+	}
+	else if (strcmp(command, FILE_CMD) == 0)
+	{
+		console.log("User sending file...");
+		bzero(command, CMD_LENGTH);
+		sendFileHandler();
+	}
+	else
+	{
+		console.error("Invalid command");
+		bzero(command, CMD_LENGTH);
+	}
 }
 
 /**
@@ -64,10 +126,10 @@ void sendMsgHandler()
  */
 void receiveMsgHandler()
 {
-	char message[LENGTH] = {};
-	while (1)
+	char message[MSG_LENGTH];
+	while (flag)
 	{
-		int receive = recv(sockfd, message, LENGTH, 0);
+		int receive = recv(sockfd, message, MSG_LENGTH, 0);
 		if (receive > 0)
 		{
 			printf("%s", message);
@@ -82,6 +144,17 @@ void receiveMsgHandler()
 			// -1
 		}
 		memset(message, 0, sizeof(message));
+	}
+}
+
+/**
+ * Main program cycle
+ */
+void start()
+{
+	while (flag == 0)
+	{
+		userCmdHandler();
 	}
 }
 
@@ -145,7 +218,7 @@ int main(int argc, char **argv)
 	printf("=== WELCOME TO THE CHATROOM ===\n");
 
 	pthread_t send_msg_thread;
-	if (pthread_create(&send_msg_thread, NULL, (void *)sendMsgHandler, NULL) != 0)
+	if (pthread_create(&send_msg_thread, NULL, (void *)start, NULL) != 0)
 	{
 		console.error("Pthread could not be created");
 		return EXIT_FAILURE;
