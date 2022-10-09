@@ -11,6 +11,7 @@
 #include "../util/stringy.c"
 
 #define MAX_CLIENTS 100
+#define MAX_GROUPS 100
 #define BUFFER_SIZE 2048
 
 static _Atomic unsigned int clientCount = 0;
@@ -31,7 +32,7 @@ typedef struct
 	int gid;
 } Group;
 
-Group *groups[MAX_CLIENTS];
+Group *groups[MAX_GROUPS];
 
 Client *clients[MAX_CLIENTS];
 pthread_mutex_t clientsMutex = PTHREAD_MUTEX_INITIALIZER;
@@ -87,6 +88,52 @@ void queueRemove(int uid)
 			if (clients[i]->uid == uid)
 			{
 				clients[i] = NULL;
+				break;
+			}
+		}
+	}
+
+	pthread_mutex_unlock(&clientsMutex);
+}
+
+
+/**
+ * Adds Group to grpup list
+ *
+ * @param gp Group struct
+ */
+void groupAdd(Group *gp)
+{
+	pthread_mutex_lock(&clientsMutex);
+
+	for (int i = 0; i < MAX_GROUPS; ++i)
+	{
+		if (!groups[i])
+		{
+			groups[i] = gp;
+			break;
+		}
+	}
+
+	pthread_mutex_unlock(&clientsMutex);
+}
+
+/**
+ * Removes Group from the Group List
+ *
+ * @param gid int group id
+ */
+void groupRemove(int gid)
+{
+	pthread_mutex_lock(&clientsMutex);
+
+	for (int i = 0; i < MAX_GROUPS; ++i)
+	{
+		if (groups[i])
+		{
+			if (groups[i]->gid == gid)
+			{
+				groups[i] = NULL;
 				break;
 			}
 		}
