@@ -30,7 +30,7 @@ typedef struct
 
 typedef struct 
 {
-	Client listClients[MAX_CLIENTS];
+	Client *listClients[MAX_CLIENTS];
 	int gid;
 } Group;
 
@@ -303,7 +303,7 @@ void *handleClient(void *arg)
 			strcpy(cli->name, name);
 			sprintf(buff_out, "%s has joined\n", cli->name);
 			printf("%s", buff_out);
-			sendMessage(buff_out, cli->uid);
+			sendMessage(buff_out, cli->uid, 0);
 		}
 		else
 		{
