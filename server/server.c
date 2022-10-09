@@ -12,6 +12,7 @@
 #include "authenticator.c"
 
 #define MAX_CLIENTS 100
+#define MAX_GROUPS 100
 #define BUFFER_SIZE 2048
 #define MSG_BUFFER 32
 
@@ -26,6 +27,14 @@ typedef struct
 	int uid;
 	char name[MSG_BUFFER];
 } Client;
+
+typedef struct 
+{
+	Client listClients[MAX_CLIENTS];
+	int gid;
+} Group;
+
+Group *groups[MAX_GROUPS];
 
 Client *clients[MAX_CLIENTS];
 pthread_mutex_t clientsMutex = PTHREAD_MUTEX_INITIALIZER;
@@ -89,13 +98,125 @@ void queueRemove(int uid)
 	pthread_mutex_unlock(&clientsMutex);
 }
 
+
+/**
+ * Adds Group to the Group list
+ *
+ * @param gp Group struct
+ */
+void groupAdd(Group *gp)
+{
+	pthread_mutex_lock(&clientsMutex);
+
+	for (int i = 0; i < MAX_GROUPS; ++i)
+	{
+		if (!groups[i])
+		{
+			groups[i] = gp;
+			break;
+		}
+	}
+
+	pthread_mutex_unlock(&clientsMutex);
+}
+
+/**
+ * Removes Group from the Group List
+ *
+ * @param gid int group id
+ */
+void groupRemove(int gid)
+{
+	pthread_mutex_lock(&clientsMutex);
+
+	for (int i = 0; i < MAX_GROUPS; ++i)
+	{
+		if (groups[i])
+		{
+			if (groups[i]->gid == gid)
+			{
+				groups[i] = NULL;
+				break;
+			}
+		}
+	}
+
+	pthread_mutex_unlock(&clientsMutex);
+}
+
+/**
+ * Adds Group to the Group list
+ *
+ * @param cl Client struct
+ * @param gid Int Group id
+ */
+void clientGroupAdd(Client *cl, int gid)
+{
+	pthread_mutex_lock(&clientsMutex);
+
+	for (int i = 0; i < MAX_GROUPS; ++i)
+	{
+		if (groups[i])
+		{
+			if (groups[i]->gid == gid)
+			{
+				for (int j = 0; j < MAX_CLIENTS; ++j)
+				{
+					if(!groups[i]->listCLients[j])
+					{
+						groups[i]->listClients[j] = cl;
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	pthread_mutex_unlock(&clientsMutex);
+}
+
+/**
+ * Removes Group from the Group List
+ *
+ * @param gid int group id
+ * @param uid int user id
+ */
+void clientGroupRemove(int, uid int gid)
+{
+	pthread_mutex_lock(&clientsMutex);
+
+	for (int i = 0; i < MAX_GROUPS; ++i)
+	{
+		if (groups[i])
+		{
+			if (groups[i]->gid == gid)
+			{
+				for (int j = 0; j < MAX_CLIENTS; ++j)
+				{
+					if(groups[i]->listCLients[j])
+					{
+						if(groups[i]->listCLients[j]->uid == uid)
+						{
+							groups[i]->listClients[j] = NULL;
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	pthread_mutex_unlock(&clientsMutex);
+}
+
+
 /**
  * Send message to all clients except sender
  *
  * @param s message to send
  * @param uid user id
  */
-void sendMessage(char *s, int uid)
+void sendMessage(char *s, int uid, int gid)
 {
 	pthread_mutex_lock(&clientsMutex);
 
@@ -204,7 +325,7 @@ void *handleClient(void *arg)
 		{
 			if (strlen(buff_out) > 0)
 			{
-				sendMessage(buff_out, cli->uid);
+				sendMessage(buff_out, cli->uid, 0);
 
 				strTrimLf(buff_out, strlen(buff_out));
 				printf("%s -> %s\n", buff_out, cli->name);
@@ -214,7 +335,7 @@ void *handleClient(void *arg)
 		{
 			sprintf(buff_out, "%s has left\n", cli->name);
 			printf("%s", buff_out);
-			sendMessage(buff_out, cli->uid);
+			sendMessage(buff_out, cli->uid, 0);
 			leave_flag = 1;
 		}
 		else
