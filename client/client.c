@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include "../util/stringy.c"
+#include "../util/debugger.h"
 
 #define LENGTH 2048
 #define MSG_BUFFER 32
@@ -104,7 +105,7 @@ int main(int argc, char **argv)
 
 	if (strlen(name) > MSG_BUFFER || strlen(name) < 2)
 	{
-		printf("Name must be less than 30 and more than 2 characters.\n");
+		console.error("Name must be less than 30 and more than 2 characters");
 		return EXIT_FAILURE;
 	}
 
@@ -115,7 +116,7 @@ int main(int argc, char **argv)
 
 	if (strlen(password) > MSG_BUFFER || strlen(password) < 2)
 	{
-		printf("Password must be less than 30 and more than 2 characters.\n");
+		console.error("Password must be less than 30 and more than 2 characters");
 		return EXIT_FAILURE;
 	}
 
@@ -131,7 +132,7 @@ int main(int argc, char **argv)
 	int err = connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr));
 	if (err == -1)
 	{
-		printf("ERROR: connect\n");
+		console.error("Connection failed");
 		return EXIT_FAILURE;
 	}
 
@@ -146,14 +147,14 @@ int main(int argc, char **argv)
 	pthread_t send_msg_thread;
 	if (pthread_create(&send_msg_thread, NULL, (void *)sendMsgHandler, NULL) != 0)
 	{
-		printf("ERROR: pthread\n");
+		console.error("Pthread could not be created");
 		return EXIT_FAILURE;
 	}
 
 	pthread_t recv_msg_thread;
 	if (pthread_create(&recv_msg_thread, NULL, (void *)receiveMsgHandler, NULL) != 0)
 	{
-		printf("ERROR: pthread\n");
+		console.error("Pthread could not be created");
 		return EXIT_FAILURE;
 	}
 
@@ -161,7 +162,7 @@ int main(int argc, char **argv)
 	{
 		if (flag)
 		{
-			printf("\nBye\n");
+			console.log("User session ended");
 			break;
 		}
 	}

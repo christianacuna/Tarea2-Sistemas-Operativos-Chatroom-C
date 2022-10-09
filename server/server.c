@@ -8,8 +8,9 @@
 #include <pthread.h>
 #include <sys/types.h>
 #include <signal.h>
-#include "../util/stringy.c"
 #include "authenticator.c"
+#include "../util/stringy.c"
+#include "../util/debugger.h"
 
 #define MAX_CLIENTS 100
 #define MAX_GROUPS 100
@@ -28,7 +29,7 @@ typedef struct
 	char name[MSG_BUFFER];
 } Client;
 
-typedef struct 
+typedef struct
 {
 	Client *listClients[MAX_CLIENTS];
 	int gid;
@@ -98,7 +99,6 @@ void queueRemove(int uid)
 	pthread_mutex_unlock(&clientsMutex);
 }
 
-
 /**
  * Adds Group to the Group list
  *
@@ -162,7 +162,7 @@ void clientGroupAdd(Client *cl, int gid)
 			{
 				for (int j = 0; j < MAX_CLIENTS; ++j)
 				{
-					if(!groups[i]->listClients[j])
+					if (!groups[i]->listClients[j])
 					{
 						groups[i]->listClients[j] = cl;
 						break;
@@ -193,9 +193,9 @@ void clientGroupRemove(int uid, int gid)
 			{
 				for (int j = 0; j < MAX_CLIENTS; ++j)
 				{
-					if(groups[i]->listClients[j])
+					if (groups[i]->listClients[j])
 					{
-						if(groups[i]->listClients[j]->uid == uid)
+						if (groups[i]->listClients[j]->uid == uid)
 						{
 							groups[i]->listClients[j] = NULL;
 							break;
@@ -208,7 +208,6 @@ void clientGroupRemove(int uid, int gid)
 
 	pthread_mutex_unlock(&clientsMutex);
 }
-
 
 /**
  * Send message to all clients except sender
@@ -256,18 +255,18 @@ int isValidClient(char message[MSG_BUFFER * 2], char name[MSG_BUFFER])
 
 	if (strlen(name) < 2 || strlen(name) >= MSG_BUFFER - 1)
 	{
-		printf("Invalid user name length.\n");
+		console.error("Invalid user name length");
 	}
 	else if (strlen(password) < 2 || strlen(password) >= MSG_BUFFER - 1)
 	{
-		printf("Invalid password length.\n");
+		console.error("Invalid password length");
 	}
 	else
 	{
 		isValid = authenticate(name, password);
 		if (isValid == 0)
 		{
-			printf("Authentication failed, wrong password or username.\n");
+			console.error("Authentication failed, wrong password or username");
 		}
 	}
 
@@ -293,7 +292,7 @@ void *handleClient(void *arg)
 	int result = recv(cli->sockfd, message, MSG_BUFFER * 2, 0) <= 0;
 	if (result)
 	{
-		printf("Invalid user buffered data.\n");
+		console.error("Invalid user buffered data");
 		leave_flag = 1;
 	}
 	else
@@ -340,7 +339,7 @@ void *handleClient(void *arg)
 		}
 		else
 		{
-			printf("ERROR: -1\n");
+			console.error("Buffering client");
 			leave_flag = 1;
 		}
 
@@ -384,21 +383,21 @@ int main(int argc, char **argv)
 
 	if (setsockopt(listener, SOL_SOCKET, (SO_REUSEPORT | SO_REUSEADDR), (char *)&option, sizeof(option)) < 0)
 	{
-		perror("ERROR: setsockopt failed");
+		console.error("ERROR: setsockopt failed");
 		return EXIT_FAILURE;
 	}
 
 	/* Bind */
 	if (bind(listener, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
 	{
-		perror("ERROR: Socket binding failed");
+		console.error("ERROR: Socket binding failed");
 		return EXIT_FAILURE;
 	}
 
 	/* Listen */
 	if (listen(listener, 10) < 0)
 	{
-		perror("ERROR: Socket listening failed");
+		console.error("ERROR: Socket listening failed");
 		return EXIT_FAILURE;
 	}
 
@@ -412,7 +411,7 @@ int main(int argc, char **argv)
 		/* Check if max clients is reached */
 		if ((clientCount + 1) == MAX_CLIENTS)
 		{
-			printf("Max clients reached. Rejected: ");
+			console.log("Max clients reached. Rejected: ");
 			printClientAddr(clientAddr);
 			printf(":%d\n", clientAddr.sin_port);
 			close(conn);
