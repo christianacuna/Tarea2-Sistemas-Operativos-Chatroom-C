@@ -301,7 +301,7 @@ void *handleClient(void *arg)
 		{
 			strcpy(cli->name, name);
 			sprintf(buff_out, "%s has joined\n", cli->name);
-			printf("%s", buff_out);
+			console.log(buff_out);
 			sendMessage(buff_out, cli->uid, 0);
 		}
 		else
@@ -333,7 +333,7 @@ void *handleClient(void *arg)
 		else if (receive == 0 || strcmp(buff_out, "exit") == 0)
 		{
 			sprintf(buff_out, "%s has left\n", cli->name);
-			printf("%s", buff_out);
+			console.log(buff_out);
 			sendMessage(buff_out, cli->uid, 0);
 			leave_flag = 1;
 		}

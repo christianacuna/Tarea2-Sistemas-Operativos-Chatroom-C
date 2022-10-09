@@ -7,6 +7,6 @@ static void my_log(char *s)
 }
 static void my_error(char *s)
 {
-    printf("[-] Error: %s", s);
+    printf("[-] Error: %s\n", s);
 }
 namespace_struct const console = {my_log, my_error};
