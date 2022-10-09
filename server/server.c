@@ -162,7 +162,7 @@ void clientGroupAdd(Client *cl, int gid)
 			{
 				for (int j = 0; j < MAX_CLIENTS; ++j)
 				{
-					if(!groups[i]->listCLients[j])
+					if(!groups[i]->listClients[j])
 					{
 						groups[i]->listClients[j] = cl;
 						break;
@@ -181,7 +181,7 @@ void clientGroupAdd(Client *cl, int gid)
  * @param gid int group id
  * @param uid int user id
  */
-void clientGroupRemove(int, uid int gid)
+void clientGroupRemove(int uid, int gid)
 {
 	pthread_mutex_lock(&clientsMutex);
 
@@ -193,9 +193,9 @@ void clientGroupRemove(int, uid int gid)
 			{
 				for (int j = 0; j < MAX_CLIENTS; ++j)
 				{
-					if(groups[i]->listCLients[j])
+					if(groups[i]->listClients[j])
 					{
-						if(groups[i]->listCLients[j]->uid == uid)
+						if(groups[i]->listClients[j]->uid == uid)
 						{
 							groups[i]->listClients[j] = NULL;
 							break;
