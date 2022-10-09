@@ -9,9 +9,11 @@
 #include <sys/types.h>
 #include <signal.h>
 #include "../util/stringy.c"
+#include "authenticator.c"
 
 #define MAX_CLIENTS 100
 #define BUFFER_SIZE 2048
+#define MSG_BUFFER 32
 
 static _Atomic unsigned int clientCount = 0;
 static int uid = 10;
@@ -22,7 +24,7 @@ typedef struct
 	struct sockaddr_in address;
 	int sockfd;
 	int uid;
-	char name[32];
+	char name[MSG_BUFFER];
 } Client;
 
 Client *clients[MAX_CLIENTS];
@@ -116,6 +118,42 @@ void sendMessage(char *s, int uid)
 }
 
 /**
+ * Validates the user information with the Authenticator
+ *
+ * @param message buffered message received
+ * @param username reference
+ * @param leave_flag flag to trigger a server exit
+ */
+int isValidClient(char message[MSG_BUFFER * 2], char name[MSG_BUFFER])
+{
+	int isValid = 0;
+	char password[MSG_BUFFER];
+
+	// Splits the message to extract its content
+	memcpy(name, message, MSG_BUFFER);
+	memcpy(password, message + MSG_BUFFER, MSG_BUFFER);
+
+	if (strlen(name) < 2 || strlen(name) >= MSG_BUFFER - 1)
+	{
+		printf("Invalid user name length.\n");
+	}
+	else if (strlen(password) < 2 || strlen(password) >= MSG_BUFFER - 1)
+	{
+		printf("Invalid password length.\n");
+	}
+	else
+	{
+		isValid = authenticate(name, password);
+		if (isValid == 0)
+		{
+			printf("Authentication failed, wrong password or username.\n");
+		}
+	}
+
+	return isValid;
+}
+
+/**
  * Handles all communication with the clients
  *
  * @param arg Client reference
@@ -123,24 +161,33 @@ void sendMessage(char *s, int uid)
 void *handleClient(void *arg)
 {
 	char buff_out[BUFFER_SIZE];
-	char name[32];
+	char message[MSG_BUFFER * 2];
+	char name[MSG_BUFFER];
 	int leave_flag = 0;
 
 	clientCount++;
 	Client *cli = (Client *)arg;
 
-	// Name
-	if (recv(cli->sockfd, name, 32, 0) <= 0 || strlen(name) < 2 || strlen(name) >= 32 - 1)
+	// Read message
+	int result = recv(cli->sockfd, message, MSG_BUFFER * 2, 0) <= 0;
+	if (result)
 	{
-		printf("Didn't enter the name.\n");
+		printf("Invalid user buffered data.\n");
 		leave_flag = 1;
 	}
 	else
 	{
-		strcpy(cli->name, name);
-		sprintf(buff_out, "%s has joined\n", cli->name);
-		printf("%s", buff_out);
-		sendMessage(buff_out, cli->uid);
+		if (isValidClient(message, name) == 1)
+		{
+			strcpy(cli->name, name);
+			sprintf(buff_out, "%s has joined\n", cli->name);
+			printf("%s", buff_out);
+			sendMessage(buff_out, cli->uid);
+		}
+		else
+		{
+			leave_flag = 1;
+		}
 	}
 
 	bzero(buff_out, BUFFER_SIZE);

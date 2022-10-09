@@ -10,11 +10,13 @@
 #include "../util/stringy.c"
 
 #define LENGTH 2048
+#define MSG_BUFFER 32
 
 // Global variables
 volatile sig_atomic_t flag = 0;
 int sockfd = 0;
-char name[32];
+char name[MSG_BUFFER];
+char password[MSG_BUFFER];
 
 /**
  * Used for Ctrl + C exit command
@@ -32,7 +34,7 @@ void exitOnCommand(int sig)
 void sendMsgHandler()
 {
 	char message[LENGTH] = {};
-	char buffer[LENGTH + 32] = {};
+	char buffer[LENGTH + MSG_BUFFER + 2] = {};
 
 	while (1)
 	{
@@ -51,7 +53,7 @@ void sendMsgHandler()
 		}
 
 		bzero(message, LENGTH);
-		bzero(buffer, LENGTH + 32);
+		bzero(buffer, LENGTH + MSG_BUFFER);
 	}
 	exitOnCommand(2);
 }
@@ -95,19 +97,31 @@ int main(int argc, char **argv)
 
 	signal(SIGINT, exitOnCommand);
 
+	// User name input
 	printf("Please enter your name: ");
-	fgets(name, 32, stdin);
-	strTrimLf(name, strlen(name));
+	fgets(name, MSG_BUFFER, stdin);
+	strTrimAll(name, strlen(name));
 
-	if (strlen(name) > 32 || strlen(name) < 2)
+	if (strlen(name) > MSG_BUFFER || strlen(name) < 2)
 	{
 		printf("Name must be less than 30 and more than 2 characters.\n");
 		return EXIT_FAILURE;
 	}
 
+	// User password input
+	printf("Please enter your password: ");
+	fgets(password, MSG_BUFFER, stdin);
+	strTrimAll(password, strlen(password));
+
+	if (strlen(password) > MSG_BUFFER || strlen(password) < 2)
+	{
+		printf("Password must be less than 30 and more than 2 characters.\n");
+		return EXIT_FAILURE;
+	}
+
 	struct sockaddr_in server_addr;
 
-	/* Socket settings */
+	// Socket settings
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_addr.s_addr = inet_addr(ip);
@@ -121,8 +135,11 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	// Send name
-	send(sockfd, name, 32, 0);
+	// Send message
+	char message[64];
+	memcpy(message, name, MSG_BUFFER);
+	memcpy(message + MSG_BUFFER, password, MSG_BUFFER);
+	send(sockfd, message, 64, 0);
 
 	printf("=== WELCOME TO THE CHATROOM ===\n");
 
