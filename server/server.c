@@ -28,7 +28,7 @@ typedef struct
 
 typedef struct 
 {
-	Client listClient[MAX_CLIENTS];
+	Client listClients[MAX_CLIENTS];
 	int gid;
 } Group;
 
@@ -98,7 +98,7 @@ void queueRemove(int uid)
 
 
 /**
- * Adds Group to grpup list
+ * Adds Group to the Group list
  *
  * @param gp Group struct
  */
@@ -141,6 +141,72 @@ void groupRemove(int gid)
 
 	pthread_mutex_unlock(&clientsMutex);
 }
+
+/**
+ * Adds Group to the Group list
+ *
+ * @param cl Client struct
+ * @param gid Int Group id
+ */
+void clientGroupAdd(Client *cl, int gid)
+{
+	pthread_mutex_lock(&clientsMutex);
+
+	for (int i = 0; i < MAX_GROUPS; ++i)
+	{
+		if (groups[i])
+		{
+			if (groups[i]->gid == gid)
+			{
+				for (int j = 0; j < MAX_CLIENTS; ++j)
+				{
+					if(!groups[i]->listCLients[j])
+					{
+						groups[i]->listClients[j] = cl;
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	pthread_mutex_unlock(&clientsMutex);
+}
+
+/**
+ * Removes Group from the Group List
+ *
+ * @param gid int group id
+ * @param uid int user id
+ */
+void clientGroupRemove(int, uid int gid)
+{
+	pthread_mutex_lock(&clientsMutex);
+
+	for (int i = 0; i < MAX_GROUPS; ++i)
+	{
+		if (groups[i])
+		{
+			if (groups[i]->gid == gid)
+			{
+				for (int j = 0; j < MAX_CLIENTS; ++j)
+				{
+					if(groups[i]->listCLients[j])
+					{
+						if(groups[i]->listCLients[j]->uid == uid)
+						{
+							groups[i]->listClients[j] = NULL;
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	pthread_mutex_unlock(&clientsMutex);
+}
+
 
 /**
  * Send message to all clients except sender
