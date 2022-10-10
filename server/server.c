@@ -391,6 +391,7 @@ void *newClientHandler(void *arg)
 
 int main(int argc, char **argv)
 {
+	startLog("server");
 	if (argc != 2)
 	{
 		printf("Usage: %s <port>\n", argv[0]);

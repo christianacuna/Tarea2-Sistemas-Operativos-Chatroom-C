@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "file_manager.h"
 #include "../util/debugger.h"
 
 /**
@@ -14,7 +15,28 @@ FILE *openFile(char *filename)
     if (fp == NULL)
     {
         console.error("Reading file");
-        exit(1);
     }
     return fp;
+}
+
+/**
+ * Writes to a new file
+ *
+ * @param filename
+ * @param content
+ */
+void writeFile(char *filename, char *content)
+{
+    FILE *fp = fopen(filename, "a");
+
+    if (fp == NULL)
+    {
+        printf("File %s can't be opened\n", filename);
+    }
+
+    // Write
+    fflush(stdin);
+    fputs(content, fp);
+
+    fclose(fp);
 }

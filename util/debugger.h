@@ -13,4 +13,11 @@ typedef struct
 } namespace_struct;
 extern namespace_struct const console;
 
+/**
+ * Starts a new log file
+ *
+ * @param descriptor addition to the filename
+ */
+void startLog(char *descriptor);
+
 #endif // CONSOLE_H

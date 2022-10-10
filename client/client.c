@@ -9,7 +9,7 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include "message_manager.c"
-#include "../util/file_manager.c"
+#include "../util/file_manager.h"
 #include "../util/stringy.c"
 #include "../util/debugger.h"
 
@@ -73,6 +73,7 @@ void sendFileHandler()
 {
 	FILE *fp = openFile("../README.md");
 	sendFile(fp, sockfd);
+	fclose(fp);
 	console.log("File data sent successfully");
 }
 
@@ -214,12 +215,14 @@ void start()
 
 int main(int argc, char **argv)
 {
+	startLog("client");
 	// Port in use
 	if (argc != 2)
 	{
 		char errorMsg[48];
 		sprintf(errorMsg, "Port already in use: %s <port>\n", argv[0]);
 		console.error(errorMsg);
+		bzero(errorMsg, 48);
 		return EXIT_FAILURE;
 	}
 
