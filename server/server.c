@@ -33,7 +33,7 @@ typedef struct
 	char name[MSG_BUFFER];
 } Client;
 
-typedef struct
+typedef struct 
 {
 	Client *listClients[MAX_CLIENTS];
 	int gid;
