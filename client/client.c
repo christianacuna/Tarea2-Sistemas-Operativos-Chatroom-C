@@ -35,7 +35,7 @@
 volatile sig_atomic_t flag = 0;
 int sockfd = 0;
 char name[MSG_BUFFER];
-char *commands[CMD_COUNT] = {CHAT_CMD, FILE_CMD, MENU_CMD, EXIT_CMD};
+char *commands[CMD_COUNT] = {CHAT_CMD, FILE_CMD, MENU_CMD, CREATE_GROUP_CMD, JOIN_GROUP_CMD ,EXIT_CMD};
 
 /**
  * Used for Ctrl + C exit command
