@@ -23,7 +23,13 @@
 #define MENU_CMD "/menu"
 #define CHAT_CMD "/chat"
 #define FILE_CMD "/file"
-#define CMD_COUNT 4 // Update this base on the number of commands
+#define CREATE_GROUP_CMD "/cgroup"
+#define JOIN_GROUP_CMD "/jgroup"
+#define CMD_COUNT 6 // Update this base on the number of commands
+
+// Client Private Characters
+#define SERVER_CMD '&'
+#define NEW_REPLACE '$'
 
 // Global variables
 volatile sig_atomic_t flag = 0;
@@ -44,7 +50,7 @@ void exitOnCommand(int sig)
 /**
  * Handler that waits for any user input
  *
- * @param input
+ * @param input user input
  * @param length user input expected length
  */
 void userInputHandler(char *input, int length)
@@ -53,6 +59,20 @@ void userInputHandler(char *input, int length)
 	fgets(input, length, stdin);
 	strTrimLf(input, length);
 }
+/**
+ * Handler that makes sure user input does not contain restricted characters, 
+ * if so replaces them
+ * @param input user input
+ * @param length user input expected length
+*/
+void userInputCleaner(char *input, int length)
+{
+	console.log("User tried to send message with restricted character, replacing with new");
+	if(input[0] == SERVER_CMD)
+	{
+		input[0] = NEW_REPLACE;
+	}
+}
 
 /**
  * Handler that waits for user text message
@@ -60,12 +80,39 @@ void userInputHandler(char *input, int length)
 void sendMsgHandler()
 {
 	char message[MSG_LENGTH];
-	printf("Please input a group or user name:\n");
+	printf("Please input a group id or user name:\n");
 	userInputHandler(message, MSG_LENGTH);
 	sendMsg(name, message, MSG_LENGTH, sockfd);
 	bzero(message, MSG_LENGTH);
 }
+/**
+ * Handler that sends the correct command to the server to join groups
+*/
+void sendGroupJoinHandler()
+{
+	char message[MSG_LENGTH];
+	printf("Please input group id(Numbers) you want to join [0-99]");
+	userInputHandler(message, MSG_LENGTH);
+	sendMsg(name,message,MSG_LENGTH, sockfd);
+	bzero(message, MSG_LENGTH);
 
+}
+
+/**
+ * Handler that sends the correct command to the server to join groups
+*/
+void sendGroupCreateHandler()
+{
+	int new_msg_length = MSG_LENGTH - 5;
+	char message[new_msg_length];
+	char join_command[5] = "join_";
+	printf("Please input group id(Numbers) you want to create [0-99]");
+	userInputHandler(message, new_msg_length);
+	strcat(join_command,message);
+	sendMsg(name,join_command,MSG_LENGTH, sockfd);
+	bzero(message, MSG_LENGTH);
+
+}
 /**
  * Handler that waits for user file to send
  */
@@ -113,6 +160,18 @@ void userCmdHandler()
 		console.log("User sending file...");
 		bzero(command, CMD_LENGTH);
 		sendFileHandler();
+	}
+	else if (strcmp(command, CREATE_GROUP_CMD) == 0)
+	{
+		console.log("User trying to create a group...");
+		bzero(command, CMD_LENGTH);
+		sendMsgHandler();
+	}
+	else if (strcmp(command, JOIN_GROUP_CMD) == 0)
+	{
+		console.log("User trying to join a group...");
+		bzero(command, CMD_LENGTH);
+		sendMsgHandler();
 	}
 	else
 	{

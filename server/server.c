@@ -33,6 +33,7 @@ typedef struct
 	char name[MSG_BUFFER];
 } Client;
 
+/* Group structure */
 typedef struct 
 {
 	Client *listClients[MAX_CLIENTS];
