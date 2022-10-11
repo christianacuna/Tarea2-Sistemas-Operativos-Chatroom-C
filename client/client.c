@@ -48,6 +48,22 @@ void exitOnCommand(int sig)
 }
 
 /**
+ * Handler that makes sure user input does not contain restricted characters, 
+ * if so replaces them
+ * @param input user input
+ * @param length user input expected length
+*/
+void userInputCleaner(char *input, int length)
+{
+	if(input[0] == SERVER_CMD)
+	{
+		console.log("User tried to send message with restricted character, replacing with new");
+		input[0] = NEW_REPLACE;
+	}
+}
+
+
+/**
  * Handler that waits for any user input
  *
  * @param input user input
@@ -58,20 +74,7 @@ void userInputHandler(char *input, int length)
 	strOverwriteStdout();
 	fgets(input, length, stdin);
 	strTrimLf(input, length);
-}
-/**
- * Handler that makes sure user input does not contain restricted characters, 
- * if so replaces them
- * @param input user input
- * @param length user input expected length
-*/
-void userInputCleaner(char *input, int length)
-{
-	console.log("User tried to send message with restricted character, replacing with new");
-	if(input[0] == SERVER_CMD)
-	{
-		input[0] = NEW_REPLACE;
-	}
+	userInputCleaner(input, length);
 }
 
 /**
