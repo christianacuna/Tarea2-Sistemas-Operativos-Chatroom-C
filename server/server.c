@@ -21,13 +21,13 @@
 #define SEVER_ERROR "500"
 
 /* Server commands accepted from Client */
-#define GROUP_JOIN_CMD "&join"
-#define GROUP_CREATE_CMD "&create"
-#define GROUP_LIST_CMD "&glist"
-#define GROUP_MEMBER_LIST_CMD "&gmemlist"
+#define GROUP_JOIN_CMD "$join"
+#define GROUP_CREATE_CMD "$create"
+#define GROUP_LIST_CMD "$glist"
+#define GROUP_MEMBER_LIST_CMD "$gmemlist"
 
 /* First character from client to allow server command execution */
-#define SERVER_CMD_CHAR "$"
+#define SERVER_CMD_CHAR '$'
 
 static _Atomic unsigned int clientCount = 0;
 static int uid = 10;
@@ -303,7 +303,7 @@ int validateClient(char message[MSG_BUFFER * 2], char name[MSG_BUFFER], int sock
  * @param buffer buffer recieved by the client
 */
 void cmdHandler(char *buffer){
-	
+	console.log("Client sent command request");
 	if (strstr(buffer, GROUP_JOIN_CMD) != NULL){
 		console.log("User tried to Join Group");
 	}
@@ -319,6 +319,27 @@ void cmdHandler(char *buffer){
 	else{
 		console.log("User tried to use invalid command");
 	}
+}
+/**
+ * Splits a String to an Array using delimiter
+ *
+ * @param str String to split
+ * @param array Char Array to store split output
+ * @param delimiter Char guide split str
+ */
+void splitStrToArray(char *str, char **array, char *delimiter)
+{
+	pthread_mutex_lock(&clientsMutex);
+
+    int i = 0;
+	char *token = strtok (str, delimiter);
+    while (token != NULL)
+    {
+        array[i++] = token;
+        token = strtok (NULL, delimiter);
+    }
+
+	pthread_mutex_unlock(&clientsMutex);
 }
 /**
  * Handles all communication with the clients
@@ -343,8 +364,21 @@ void *clientListener(Client *cli)
 		{
 			if (strlen(buff_out) > 0)
 			{
-				if (buff_out[0] == SERVER_CMD_CHAR){
-					cmdHandler(buff_out);
+				char buff_out_copy[BUFFER_SIZE];
+				printf("test: %s",buff_out);
+				// Makes copy of the buff so we can process it without damaging original
+				strcpy(buff_out_copy, buff_out);
+
+				// Array on which we store client input splited 
+				char *stored[2];
+				splitStrToArray(buff_out_copy,stored, " ");
+				strTrimLf(stored[1], strlen(stored[1]));
+				printf("stored[0]:%s\n",stored[0]);
+				printf("stored[1]:%s\n",stored[1]);
+				printf("stored[1][0]:%c\n",stored[1][0]);
+				
+				if (stored[1][0] == SERVER_CMD_CHAR){
+					cmdHandler(stored[1]);
 				}
 				sendMessage(buff_out, cli->uid, 0);
 				strTrimLf(buff_out, strlen(buff_out));
@@ -355,7 +389,7 @@ void *clientListener(Client *cli)
 		{
 			sprintf(buff_out, "%s has left", cli->name);
 			console.log(buff_out);
-			sendMessage(buff_out, cli->uid, 0);
+			//sendMessage(buff_out, cli->uid, 0);
 			leave_flag = 1;
 		}
 		else
