@@ -20,6 +20,15 @@
 #define SEVER_OK "200"
 #define SEVER_ERROR "500"
 
+/* Server commands accepted from Client */
+#define GROUP_JOIN_CMD "&join"
+#define GROUP_CREATE_CMD "&create"
+#define GROUP_LIST_CMD "&glist"
+#define GROUP_MEMBER_LIST_CMD "&gmemlist"
+
+/* First character from client to allow server command execution */
+#define SERVER_CMD_CHAR "$"
+
 static _Atomic unsigned int clientCount = 0;
 static int uid = 10;
 int leave_flag = 0;
@@ -288,7 +297,29 @@ int validateClient(char message[MSG_BUFFER * 2], char name[MSG_BUFFER], int sock
 
 	return isValid;
 }
-
+/**
+ * Operates which command was issued to the server by the client
+ * 
+ * @param buffer buffer recieved by the client
+*/
+void cmdHandler(char *buffer){
+	
+	if (strstr(buffer, GROUP_JOIN_CMD) != NULL){
+		console.log("User tried to Join Group");
+	}
+	else if (strstr(buffer,  GROUP_CREATE_CMD) != NULL){
+		console.log("User tried to Create Group");
+	}
+	else if (strstr(buffer, GROUP_LIST_CMD) != NULL){
+		console.log("User tried to query Group List");
+	}
+	else if (strstr(buffer, GROUP_MEMBER_LIST_CMD) != NULL){
+		console.log("User tried to query for Member List in a group");
+	}
+	else{
+		console.log("User tried to use invalid command");
+	}
+}
 /**
  * Handles all communication with the clients
  *
@@ -312,8 +343,10 @@ void *clientListener(Client *cli)
 		{
 			if (strlen(buff_out) > 0)
 			{
+				if (buff_out[0] == SERVER_CMD_CHAR){
+					cmdHandler(buff_out);
+				}
 				sendMessage(buff_out, cli->uid, 0);
-
 				strTrimLf(buff_out, strlen(buff_out));
 				printf("%s -> %s\n", buff_out, cli->name);
 			}
