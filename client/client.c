@@ -279,10 +279,10 @@ int main(int argc, char **argv)
 {
 	startLog("client");
 	// Port in use
-	if (argc != 2)
+	if (argc > 3 || argc < 1)
 	{
 		char errorMsg[48];
-		sprintf(errorMsg, "Port already in use: %s <port>\n", argv[0]);
+		sprintf(errorMsg, "Port already in use: %s <port> <ip>\n", argv[0]);
 		console.error(errorMsg);
 		bzero(errorMsg, 48);
 		return EXIT_FAILURE;
@@ -293,6 +293,9 @@ int main(int argc, char **argv)
 
 	// Socket settings
 	char *ip = "127.0.0.1";
+	if (argv[2] != NULL){
+		ip = argv[2];
+	}
 	int port = atoi(argv[1]);
 	struct sockaddr_in server_addr;
 

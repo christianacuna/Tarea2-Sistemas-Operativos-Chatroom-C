@@ -167,7 +167,7 @@ void groupRemove(int gid)
 void clientGroupAdd(Client *cl, int gid)
 {
 	pthread_mutex_lock(&clientsMutex);
-
+	//char buff_out[BUFFER_SIZE];
 	for (int i = 0; i < MAX_GROUPS; ++i)
 	{
 		if (groups[i])
@@ -179,13 +179,18 @@ void clientGroupAdd(Client *cl, int gid)
 					if (!groups[i]->listClients[j])
 					{
 						groups[i]->listClients[j] = cl;
+						//buff_out = "Group Joined\n";
 						break;
 					}
 				}
 			}
+			else
+			{
+				//buff_out = "Group does not exist\n";
+			}
 		}
 	}
-
+	//sendMessage(buff_out, cl->uid, 0);
 	pthread_mutex_unlock(&clientsMutex);
 }
 
@@ -298,27 +303,46 @@ int validateClient(char message[MSG_BUFFER * 2], char name[MSG_BUFFER], int sock
 	return isValid;
 }
 /**
+ * Eliminates empty spaces on an Char Array.
+ * 
+ * @param array char array to be cleaned.
+*/
+void cleanInputArray(char *array)
+{
+	int i = 0;
+	while(array[i] != NULL){
+		strTrimLf(array[i], strlen(array[i]));
+		i++;
+	}
+}
+/**
  * Operates which command was issued to the server by the client
  * 
  * @param buffer buffer recieved by the client
 */
-void cmdHandler(char *buffer){
+void cmdHandler(char **buffer,Client *cl){
+	pthread_mutex_lock(&clientsMutex);
+
+	char *command = buffer[1];
+	char *argument = buffer[2];
 	console.log("Client sent command request");
-	if (strstr(buffer, GROUP_JOIN_CMD) != NULL){
+	if (strstr(command, GROUP_JOIN_CMD) != NULL){
 		console.log("User tried to Join Group");
+		clientGroupAdd(cl,atoi(argument));
 	}
-	else if (strstr(buffer,  GROUP_CREATE_CMD) != NULL){
+	else if (strstr(command,  GROUP_CREATE_CMD) != NULL){
 		console.log("User tried to Create Group");
 	}
-	else if (strstr(buffer, GROUP_LIST_CMD) != NULL){
+	else if (strstr(command, GROUP_LIST_CMD) != NULL){
 		console.log("User tried to query Group List");
 	}
-	else if (strstr(buffer, GROUP_MEMBER_LIST_CMD) != NULL){
+	else if (strstr(command, GROUP_MEMBER_LIST_CMD) != NULL){
 		console.log("User tried to query for Member List in a group");
 	}
 	else{
 		console.log("User tried to use invalid command");
 	}
+	pthread_mutex_unlock(&clientsMutex);
 }
 /**
  * Splits a String to an Array using delimiter
@@ -370,15 +394,16 @@ void *clientListener(Client *cli)
 				strcpy(buff_out_copy, buff_out);
 
 				// Array on which we store client input splited 
-				char *stored[2];
+				char *stored[3];
 				splitStrToArray(buff_out_copy,stored, " ");
 				strTrimLf(stored[1], strlen(stored[1]));
+				
 				printf("stored[0]:%s\n",stored[0]);
 				printf("stored[1]:%s\n",stored[1]);
 				printf("stored[1][0]:%c\n",stored[1][0]);
 				
 				if (stored[1][0] == SERVER_CMD_CHAR){
-					cmdHandler(stored[1]);
+					cmdHandler(stored,cli);
 				}
 				sendMessage(buff_out, cli->uid, 0);
 				strTrimLf(buff_out, strlen(buff_out));
@@ -460,13 +485,16 @@ void *newClientHandler(void *arg)
 int main(int argc, char **argv)
 {
 	startLog("server");
-	if (argc != 2)
+	if (argc > 3 || argc < 1)
 	{
-		printf("Usage: %s <port>\n", argv[0]);
+		printf("Usage: %s <port> <ip - (default:127.0.0.1)>\n", argv[0]);
 		return EXIT_FAILURE;
 	}
 
 	char *ip = "127.0.0.1";
+	if (argv[2] != NULL){
+		ip = argv[2];
+	}
 	int port = atoi(argv[1]);
 	int option = 1;
 	int listener = 0, conn = 0;
