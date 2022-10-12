@@ -1,4 +1,4 @@
-# CHATROOM-C
+# CHATROOM-TECC
 
 TODO: description of the program (porpoise)
 
