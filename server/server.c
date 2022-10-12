@@ -423,6 +423,12 @@ void *newClientHandler(void *arg)
 	return clientListener(cli);
 }
 
+/**
+ * Program entry point
+ * Server application, socket base
+ *
+ * @source https://github.com/nikhilroxtomar/Chatroom-in-C
+ */
 int main(int argc, char **argv)
 {
 	startLog("server");

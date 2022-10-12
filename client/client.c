@@ -275,6 +275,12 @@ void start()
 	}
 }
 
+/**
+ * Program entry point
+ * Client application, socket base
+ *
+ * @source https://github.com/nikhilroxtomar/Chatroom-in-C
+ */
 int main(int argc, char **argv)
 {
 	startLog("client");
