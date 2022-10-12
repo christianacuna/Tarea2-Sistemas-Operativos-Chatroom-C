@@ -21,13 +21,13 @@
 #define SEVER_ERROR "500"
 
 /* Server commands accepted from Client */
-#define GROUP_JOIN_CMD "&join"
-#define GROUP_CREATE_CMD "&create"
-#define GROUP_LIST_CMD "&glist"
-#define GROUP_MEMBER_LIST_CMD "&gmemlist"
+#define GROUP_JOIN_CMD "$join"
+#define GROUP_CREATE_CMD "$create"
+#define GROUP_LIST_CMD "$glist"
+#define GROUP_MEMBER_LIST_CMD "$gmemlist"
 
 /* First character from client to allow server command execution */
-#define SERVER_CMD_CHAR "$"
+#define SERVER_CMD_CHAR '$'
 
 static _Atomic unsigned int clientCount = 0;
 static int uid = 10;
@@ -53,6 +53,7 @@ Group *groups[MAX_GROUPS];
 
 Client *clients[MAX_CLIENTS];
 pthread_mutex_t clientsMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t groupMutex = PTHREAD_MUTEX_INITIALIZER;
 
 /**
  * Prints the address in IP format
@@ -120,7 +121,7 @@ void queueRemove(int uid)
  */
 void groupAdd(Group *gp)
 {
-	pthread_mutex_lock(&clientsMutex);
+	pthread_mutex_lock(&groupMutex);
 
 	for (int i = 0; i < MAX_GROUPS; ++i)
 	{
@@ -131,7 +132,7 @@ void groupAdd(Group *gp)
 		}
 	}
 
-	pthread_mutex_unlock(&clientsMutex);
+	pthread_mutex_unlock(&groupMutex);
 }
 
 /**
@@ -141,7 +142,7 @@ void groupAdd(Group *gp)
  */
 void groupRemove(int gid)
 {
-	pthread_mutex_lock(&clientsMutex);
+	pthread_mutex_lock(&groupMutex);
 
 	for (int i = 0; i < MAX_GROUPS; ++i)
 	{
@@ -155,7 +156,7 @@ void groupRemove(int gid)
 		}
 	}
 
-	pthread_mutex_unlock(&clientsMutex);
+	pthread_mutex_unlock(&groupMutex);
 }
 
 /**
@@ -166,8 +167,9 @@ void groupRemove(int gid)
  */
 void clientGroupAdd(Client *cl, int gid)
 {
-	pthread_mutex_lock(&clientsMutex);
-
+	printf("its here:%d", gid);
+	pthread_mutex_lock(&groupMutex);
+	//char buff_out[BUFFER_SIZE];
 	for (int i = 0; i < MAX_GROUPS; ++i)
 	{
 		if (groups[i])
@@ -179,14 +181,19 @@ void clientGroupAdd(Client *cl, int gid)
 					if (!groups[i]->listClients[j])
 					{
 						groups[i]->listClients[j] = cl;
+						//buff_out = "Group Joined\n";
 						break;
 					}
 				}
 			}
+			else
+			{
+				//buff_out = "Group does not exist\n";
+			}
 		}
 	}
-
-	pthread_mutex_unlock(&clientsMutex);
+	//sendMessage(buff_out, cl->uid, 0);
+	pthread_mutex_unlock(&groupMutex);
 }
 
 /**
@@ -197,7 +204,7 @@ void clientGroupAdd(Client *cl, int gid)
  */
 void clientGroupRemove(int uid, int gid)
 {
-	pthread_mutex_lock(&clientsMutex);
+	pthread_mutex_lock(&groupMutex);
 
 	for (int i = 0; i < MAX_GROUPS; ++i)
 	{
@@ -220,7 +227,7 @@ void clientGroupRemove(int uid, int gid)
 		}
 	}
 
-	pthread_mutex_unlock(&clientsMutex);
+	pthread_mutex_unlock(&groupMutex);
 }
 
 /**
@@ -298,27 +305,69 @@ int validateClient(char message[MSG_BUFFER * 2], char name[MSG_BUFFER], int sock
 	return isValid;
 }
 /**
+ * Eliminates empty spaces on an Char Array.
+ * 
+ * @param array char array to be cleaned.
+*/
+void cleanInputArray(char **array)
+{
+	int i = 0;
+	while(array[i] != NULL){
+		strTrimLf(array[i], strlen(array[i]));
+		i++;
+	}
+}
+/**
  * Operates which command was issued to the server by the client
  * 
  * @param buffer buffer recieved by the client
 */
-void cmdHandler(char *buffer){
-	
-	if (strstr(buffer, GROUP_JOIN_CMD) != NULL){
+void cmdHandler(char **buffer,Client *cl){
+	pthread_mutex_lock(&clientsMutex);
+
+	char *command = buffer[1];
+	char *argument = buffer[2];
+	console.log("Client sent command request");
+	if (strstr(command, GROUP_JOIN_CMD) != NULL){
 		console.log("User tried to Join Group");
+		int group_id = atoi(argument);
+		printf("stop here size: %ld", sizeof(group_id));
+		clientGroupAdd(cl,group_id);
 	}
-	else if (strstr(buffer,  GROUP_CREATE_CMD) != NULL){
+	else if (strstr(command,  GROUP_CREATE_CMD) != NULL){
 		console.log("User tried to Create Group");
 	}
-	else if (strstr(buffer, GROUP_LIST_CMD) != NULL){
+	else if (strstr(command, GROUP_LIST_CMD) != NULL){
 		console.log("User tried to query Group List");
 	}
-	else if (strstr(buffer, GROUP_MEMBER_LIST_CMD) != NULL){
+	else if (strstr(command, GROUP_MEMBER_LIST_CMD) != NULL){
 		console.log("User tried to query for Member List in a group");
 	}
 	else{
 		console.log("User tried to use invalid command");
 	}
+	pthread_mutex_unlock(&clientsMutex);
+}
+/**
+ * Splits a String to an Array using delimiter
+ *
+ * @param str String to split
+ * @param array Char Array to store split output
+ * @param delimiter Char guide split str
+ */
+void splitStrToArray(char *str, char **array, char *delimiter)
+{
+	pthread_mutex_lock(&clientsMutex);
+
+    int i = 0;
+	char *token = strtok (str, delimiter);
+    while (token != NULL)
+    {
+        array[i++] = token;
+        token = strtok (NULL, delimiter);
+    }
+
+	pthread_mutex_unlock(&clientsMutex);
 }
 /**
  * Handles all communication with the clients
@@ -343,35 +392,55 @@ void *clientListener(Client *cli)
 		{
 			if (strlen(buff_out) > 0)
 			{
-				if (buff_out[0] == SERVER_CMD_CHAR){
-					cmdHandler(buff_out);
+				char buff_out_copy[BUFFER_SIZE];
+				//printf("test: %s",buff_out);
+				// Makes copy of the buff so we can process it without damaging original
+				strcpy(buff_out_copy, buff_out);
+
+				// Array on which we store client input splited 
+				char *stored[3];
+				splitStrToArray(buff_out_copy,stored, " ");
+				strTrimLf(stored[1], strlen(stored[1]));
+				
+				// Verify if there if private character is recognized as the start of new command
+				if (stored[1][0] == SERVER_CMD_CHAR){
+					cmdHandler(stored,cli);
 				}
 				sendMessage(buff_out, cli->uid, 0);
 				strTrimLf(buff_out, strlen(buff_out));
 				printf("%s -> %s\n", buff_out, cli->name);
 			}
 		}
-		else if (receive == 0 || strcmp(buff_out, "exit") == 0)
+		else if (receive == 0 || strcmp(buff_out, "/exit") == 0)
 		{
 			sprintf(buff_out, "%s has left", cli->name);
 			console.log(buff_out);
-			sendMessage(buff_out, cli->uid, 0);
-			leave_flag = 1;
+			//sendMessage(buff_out, cli->uid, 0);
+			bzero(buff_out, BUFFER_SIZE);
+			break;
+			//leave_flag = 1;
 		}
 		else
 		{
 			console.error("Buffering client");
-			leave_flag = 1;
+			bzero(buff_out, BUFFER_SIZE);
+			break;
+			//leave_flag = 1;
 		}
 
 		bzero(buff_out, BUFFER_SIZE);
 	}
 
 	/* Delete client from queue and yield thread */
+	printf("TESTO 1\n");
 	close(cli->sockfd);
+	printf("TESTO 2\n");
 	queueRemove(cli->uid);
+	printf("TESTO 3\n");
 	free(cli);
+	printf("TESTO 4\n");
 	clientCount--;
+	printf("TESTO 9\n");
 	pthread_detach(pthread_self());
 
 	return NULL;
@@ -403,7 +472,8 @@ void *newClientHandler(void *arg)
 		if (result)
 		{
 			console.error("Invalid user buffered data");
-			leave_flag = 1;
+			break;
+			//leave_flag = 1;
 		}
 
 		// Authenticated correctly
@@ -432,13 +502,16 @@ void *newClientHandler(void *arg)
 int main(int argc, char **argv)
 {
 	startLog("server");
-	if (argc != 2)
+	if (argc > 3 || argc < 1)
 	{
-		printf("Usage: %s <port>\n", argv[0]);
+		printf("Usage: %s <port> <ip - (default:127.0.0.1)>\n", argv[0]);
 		return EXIT_FAILURE;
 	}
 
 	char *ip = "127.0.0.1";
+	if (argv[2] != NULL){
+		ip = argv[2];
+	}
 	int port = atoi(argv[1]);
 	int option = 1;
 	int listener = 0, conn = 0;
@@ -501,7 +574,7 @@ int main(int argc, char **argv)
 		/* Add client to the queue and fork thread */
 		queueAdd(cli);
 		pthread_create(&threadId, NULL, &newClientHandler, (void *)cli);
-
+		//leave_flag = 0;
 		/* Reduce CPU usage */
 		sleep(1);
 	}
