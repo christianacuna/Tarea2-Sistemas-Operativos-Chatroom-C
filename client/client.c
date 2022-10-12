@@ -145,6 +145,7 @@ void userCmdHandler()
 	if (strcmp(command, EXIT_CMD) == 0)
 	{
 		console.log("User exiting...");
+		//sendMsg(name, EXIT_CMD, 5, sockfd);
 		bzero(command, CMD_LENGTH);
 		exitOnCommand(2);
 	}
@@ -341,7 +342,7 @@ int main(int argc, char **argv)
 			break;
 		}
 	}
-
+	printf("TEST 9");
 	close(sockfd);
 
 	return EXIT_SUCCESS;

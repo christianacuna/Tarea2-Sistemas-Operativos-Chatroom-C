@@ -53,6 +53,7 @@ Group *groups[MAX_GROUPS];
 
 Client *clients[MAX_CLIENTS];
 pthread_mutex_t clientsMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t groupMutex = PTHREAD_MUTEX_INITIALIZER;
 
 /**
  * Prints the address in IP format
@@ -120,7 +121,7 @@ void queueRemove(int uid)
  */
 void groupAdd(Group *gp)
 {
-	pthread_mutex_lock(&clientsMutex);
+	pthread_mutex_lock(&groupMutex);
 
 	for (int i = 0; i < MAX_GROUPS; ++i)
 	{
@@ -131,7 +132,7 @@ void groupAdd(Group *gp)
 		}
 	}
 
-	pthread_mutex_unlock(&clientsMutex);
+	pthread_mutex_unlock(&groupMutex);
 }
 
 /**
@@ -141,7 +142,7 @@ void groupAdd(Group *gp)
  */
 void groupRemove(int gid)
 {
-	pthread_mutex_lock(&clientsMutex);
+	pthread_mutex_lock(&groupMutex);
 
 	for (int i = 0; i < MAX_GROUPS; ++i)
 	{
@@ -155,7 +156,7 @@ void groupRemove(int gid)
 		}
 	}
 
-	pthread_mutex_unlock(&clientsMutex);
+	pthread_mutex_unlock(&groupMutex);
 }
 
 /**
@@ -166,7 +167,8 @@ void groupRemove(int gid)
  */
 void clientGroupAdd(Client *cl, int gid)
 {
-	pthread_mutex_lock(&clientsMutex);
+	printf("its here:%d", gid);
+	pthread_mutex_lock(&groupMutex);
 	//char buff_out[BUFFER_SIZE];
 	for (int i = 0; i < MAX_GROUPS; ++i)
 	{
@@ -191,7 +193,7 @@ void clientGroupAdd(Client *cl, int gid)
 		}
 	}
 	//sendMessage(buff_out, cl->uid, 0);
-	pthread_mutex_unlock(&clientsMutex);
+	pthread_mutex_unlock(&groupMutex);
 }
 
 /**
@@ -202,7 +204,7 @@ void clientGroupAdd(Client *cl, int gid)
  */
 void clientGroupRemove(int uid, int gid)
 {
-	pthread_mutex_lock(&clientsMutex);
+	pthread_mutex_lock(&groupMutex);
 
 	for (int i = 0; i < MAX_GROUPS; ++i)
 	{
@@ -225,7 +227,7 @@ void clientGroupRemove(int uid, int gid)
 		}
 	}
 
-	pthread_mutex_unlock(&clientsMutex);
+	pthread_mutex_unlock(&groupMutex);
 }
 
 /**
@@ -307,7 +309,7 @@ int validateClient(char message[MSG_BUFFER * 2], char name[MSG_BUFFER], int sock
  * 
  * @param array char array to be cleaned.
 */
-void cleanInputArray(char *array)
+void cleanInputArray(char **array)
 {
 	int i = 0;
 	while(array[i] != NULL){
@@ -328,7 +330,9 @@ void cmdHandler(char **buffer,Client *cl){
 	console.log("Client sent command request");
 	if (strstr(command, GROUP_JOIN_CMD) != NULL){
 		console.log("User tried to Join Group");
-		clientGroupAdd(cl,atoi(argument));
+		int group_id = atoi(argument);
+		printf("stop here size: %ld", sizeof(group_id));
+		clientGroupAdd(cl,group_id);
 	}
 	else if (strstr(command,  GROUP_CREATE_CMD) != NULL){
 		console.log("User tried to Create Group");
@@ -389,7 +393,7 @@ void *clientListener(Client *cli)
 			if (strlen(buff_out) > 0)
 			{
 				char buff_out_copy[BUFFER_SIZE];
-				printf("test: %s",buff_out);
+				//printf("test: %s",buff_out);
 				// Makes copy of the buff so we can process it without damaging original
 				strcpy(buff_out_copy, buff_out);
 
@@ -398,10 +402,7 @@ void *clientListener(Client *cli)
 				splitStrToArray(buff_out_copy,stored, " ");
 				strTrimLf(stored[1], strlen(stored[1]));
 				
-				printf("stored[0]:%s\n",stored[0]);
-				printf("stored[1]:%s\n",stored[1]);
-				printf("stored[1][0]:%c\n",stored[1][0]);
-				
+				// Verify if there if private character is recognized as the start of new command
 				if (stored[1][0] == SERVER_CMD_CHAR){
 					cmdHandler(stored,cli);
 				}
@@ -410,27 +411,36 @@ void *clientListener(Client *cli)
 				printf("%s -> %s\n", buff_out, cli->name);
 			}
 		}
-		else if (receive == 0 || strcmp(buff_out, "exit") == 0)
+		else if (receive == 0 || strcmp(buff_out, "/exit") == 0)
 		{
 			sprintf(buff_out, "%s has left", cli->name);
 			console.log(buff_out);
 			//sendMessage(buff_out, cli->uid, 0);
-			leave_flag = 1;
+			bzero(buff_out, BUFFER_SIZE);
+			break;
+			//leave_flag = 1;
 		}
 		else
 		{
 			console.error("Buffering client");
-			leave_flag = 1;
+			bzero(buff_out, BUFFER_SIZE);
+			break;
+			//leave_flag = 1;
 		}
 
 		bzero(buff_out, BUFFER_SIZE);
 	}
 
 	/* Delete client from queue and yield thread */
+	printf("TESTO 1\n");
 	close(cli->sockfd);
+	printf("TESTO 2\n");
 	queueRemove(cli->uid);
+	printf("TESTO 3\n");
 	free(cli);
+	printf("TESTO 4\n");
 	clientCount--;
+	printf("TESTO 9\n");
 	pthread_detach(pthread_self());
 
 	return NULL;
@@ -462,7 +472,8 @@ void *newClientHandler(void *arg)
 		if (result)
 		{
 			console.error("Invalid user buffered data");
-			leave_flag = 1;
+			break;
+			//leave_flag = 1;
 		}
 
 		// Authenticated correctly
@@ -557,7 +568,7 @@ int main(int argc, char **argv)
 		/* Add client to the queue and fork thread */
 		queueAdd(cli);
 		pthread_create(&threadId, NULL, &newClientHandler, (void *)cli);
-
+		//leave_flag = 0;
 		/* Reduce CPU usage */
 		sleep(1);
 	}
