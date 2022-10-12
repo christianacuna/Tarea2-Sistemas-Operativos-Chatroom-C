@@ -324,8 +324,8 @@ int main(int argc, char **argv)
 
 	// Authenticate user
 	loginHandler();
-
-	printf("=== WELCOME TO THE CHATROOM ===\n");
+	system("clear");
+	printf("**** WELCOME TO TEC CHAT ****\n");
 
 	// Start main program thread
 	pthread_t send_msg_thread;

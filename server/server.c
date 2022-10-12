@@ -40,6 +40,8 @@ typedef struct
 	int sockfd;
 	int uid;
 	char name[MSG_BUFFER];
+	int isInGroup;
+	int groupId;
 } Client;
 
 /* Group structure */
@@ -192,6 +194,8 @@ void clientGroupAdd(Client *cl, int gid)
 			}
 		}
 	}
+	cl->isInGroup = 1;
+	cl->groupId = gid;
 	//sendMessage(buff_out, cl->uid, 0);
 	pthread_mutex_unlock(&groupMutex);
 }
@@ -202,8 +206,9 @@ void clientGroupAdd(Client *cl, int gid)
  * @param gid int group id
  * @param uid int user id
  */
-void clientGroupRemove(int uid, int gid)
+void clientGroupRemove(Client *cl, int gid)
 {
+	int uid = cl->uid;
 	pthread_mutex_lock(&groupMutex);
 
 	for (int i = 0; i < MAX_GROUPS; ++i)
@@ -226,8 +231,46 @@ void clientGroupRemove(int uid, int gid)
 			}
 		}
 	}
-
+	cl->isInGroup = 0;
+	cl->groupId = -1;
 	pthread_mutex_unlock(&groupMutex);
+}
+
+/**
+ * Send message to all clients except sender in a Group
+ *
+ * @param s message to send
+ * @param uid user id
+ */
+void sendGroupMessage(char *s, int uid, int gid)
+{
+	pthread_mutex_lock(&clientsMutex);
+	int i = 0;
+	for (i = 0; i < MAX_CLIENTS; ++i){
+		if (groups[i])
+		{
+			if (groups[i]->gid == gid){
+				break;
+			}
+		}
+	}
+
+	for (int j = 0; j < MAX_CLIENTS; ++j)
+	{
+		if (groups[i]->listClients[j])
+		{
+			if (groups[i]->listClients[j]->uid != uid)
+			{
+				if (write(groups[i]->listClients[j]->sockfd, s, strlen(s)) < 0)
+				{
+					perror("ERROR: write to descriptor failed");
+					break;
+				}
+			}
+		}
+	}
+
+	pthread_mutex_unlock(&clientsMutex);
 }
 
 /**
@@ -332,7 +375,6 @@ void cmdHandler(char **buffer,Client *cl){
 	if (strstr(command, GROUP_JOIN_CMD) != NULL){
 		console.log("User tried to Join Group");
 		int group_id = atoi(argument);
-		printf("stop here size: %ld", sizeof(group_id));
 		clientGroupAdd(cl,group_id);
 	}
 	else if (strstr(command,  GROUP_CREATE_CMD) != NULL){
@@ -340,21 +382,19 @@ void cmdHandler(char **buffer,Client *cl){
 		int group_id = atoi(argument);
 		Group *gp = (Group *)malloc(sizeof(Group));
 		gp->gid = group_id;
-		clientGroupAdd(cl, group_id);
 		groupAdd(gp);
+		clientGroupAdd(cl, group_id);
 	}
 	else if (strstr(command, GROUP_LIST_CMD) != NULL){
 		console.log("User tried to query Group List");
-		int listAmount = sizeof(groups)/sizeof(Group*);
 		char message[MSG_BUFFER];
-		sprintf(message, "%d Groups found:", listAmount);
+		sprintf(message, "----Groups found:----\n");
 		write(cl->sockfd, message, strlen(message));
 		bzero(message,MSG_BUFFER);
 		i = 0;
 		while (groups[i] != NULL)
 		{
-			printf("TESTO");
-			sprintf(message, "%d", groups[i]->gid);
+			sprintf(message, "%d\n", groups[i]->gid);
 			if (write(cl->sockfd, message, strlen(message)) < 0)
 				{
 				perror("ERROR: write to descriptor failed");
@@ -362,6 +402,8 @@ void cmdHandler(char **buffer,Client *cl){
 			}
 			i++;	
 		}
+		sprintf(message, "----( %d ) active----\n", i);
+		write(cl->sockfd, message, strlen(message));
 		
 	}
 	else if (strstr(command, GROUP_MEMBER_LIST_CMD) != NULL){
@@ -430,8 +472,14 @@ void *clientListener(Client *cli)
 				if (stored[1][0] == SERVER_CMD_CHAR){
 					strTrimLf(stored[1], strlen(stored[1]));
 					cmdHandler(stored,cli);
+				}
+				else if (cli->isInGroup == 1){
+					printf("HOLA GRUPO");
+					sendGroupMessage(buff_out,cli->uid,cli->groupId);
 				} 
-				sendMessage(buff_out, cli->uid, 0);
+				else{
+					sendMessage(buff_out, cli->uid, cli->groupId);
+				}
 				strTrimLf(buff_out, strlen(buff_out));
 				printf("%s -> %s\n", buff_out, cli->name);
 			}
@@ -590,6 +638,8 @@ int main(int argc, char **argv)
 		cli->address = clientAddr;
 		cli->sockfd = conn;
 		cli->uid = uid++;
+		cli->isInGroup = 0;
+		cli->groupId = -1;
 
 		/* Add client to the queue and fork thread */
 		queueAdd(cli);
