@@ -42,6 +42,7 @@ void sendFile(FILE *fp, int sockfd)
             exit(1);
         }
         bzero(data, FILE_SIZE);
+        sleep(1);
     }
 }
 

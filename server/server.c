@@ -167,7 +167,7 @@ void groupRemove(int gid)
  */
 void clientGroupAdd(Client *cl, int gid)
 {
-	printf("its here:%d", gid);
+	//printf("its here:%d", gid);
 	pthread_mutex_lock(&groupMutex);
 	//char buff_out[BUFFER_SIZE];
 	for (int i = 0; i < MAX_GROUPS; ++i)
@@ -327,6 +327,7 @@ void cmdHandler(char **buffer,Client *cl){
 
 	char *command = buffer[1];
 	char *argument = buffer[2];
+	int i = 0;
 	console.log("Client sent command request");
 	if (strstr(command, GROUP_JOIN_CMD) != NULL){
 		console.log("User tried to Join Group");
@@ -336,9 +337,32 @@ void cmdHandler(char **buffer,Client *cl){
 	}
 	else if (strstr(command,  GROUP_CREATE_CMD) != NULL){
 		console.log("User tried to Create Group");
+		int group_id = atoi(argument);
+		Group *gp = (Group *)malloc(sizeof(Group));
+		gp->gid = group_id;
+		clientGroupAdd(cl, group_id);
+		groupAdd(gp);
 	}
 	else if (strstr(command, GROUP_LIST_CMD) != NULL){
 		console.log("User tried to query Group List");
+		int listAmount = sizeof(groups)/sizeof(Group*);
+		char message[MSG_BUFFER];
+		sprintf(message, "%d Groups found:", listAmount);
+		write(cl->sockfd, message, strlen(message));
+		bzero(message,MSG_BUFFER);
+		i = 0;
+		while (groups[i] != NULL)
+		{
+			printf("TESTO");
+			sprintf(message, "%d", groups[i]->gid);
+			if (write(cl->sockfd, message, strlen(message)) < 0)
+				{
+				perror("ERROR: write to descriptor failed");
+				break;
+			}
+			i++;	
+		}
+		
 	}
 	else if (strstr(command, GROUP_MEMBER_LIST_CMD) != NULL){
 		console.log("User tried to query for Member List in a group");
@@ -348,6 +372,7 @@ void cmdHandler(char **buffer,Client *cl){
 	}
 	pthread_mutex_unlock(&clientsMutex);
 }
+
 /**
  * Splits a String to an Array using delimiter
  *
@@ -388,6 +413,7 @@ void *clientListener(Client *cli)
 		}
 
 		int receive = recv(cli->sockfd, buff_out, BUFFER_SIZE, 0);
+		printf("%s",buff_out);
 		if (receive > 0)
 		{
 			if (strlen(buff_out) > 0)
@@ -398,14 +424,13 @@ void *clientListener(Client *cli)
 				strcpy(buff_out_copy, buff_out);
 
 				// Array on which we store client input splited 
-				char *stored[3];
+				char *stored[BUFFER_SIZE];
 				splitStrToArray(buff_out_copy,stored, " ");
-				strTrimLf(stored[1], strlen(stored[1]));
-				
 				// Verify if there if private character is recognized as the start of new command
 				if (stored[1][0] == SERVER_CMD_CHAR){
+					strTrimLf(stored[1], strlen(stored[1]));
 					cmdHandler(stored,cli);
-				}
+				} 
 				sendMessage(buff_out, cli->uid, 0);
 				strTrimLf(buff_out, strlen(buff_out));
 				printf("%s -> %s\n", buff_out, cli->name);
@@ -432,15 +457,10 @@ void *clientListener(Client *cli)
 	}
 
 	/* Delete client from queue and yield thread */
-	printf("TESTO 1\n");
 	close(cli->sockfd);
-	printf("TESTO 2\n");
 	queueRemove(cli->uid);
-	printf("TESTO 3\n");
 	free(cli);
-	printf("TESTO 4\n");
 	clientCount--;
-	printf("TESTO 9\n");
 	pthread_detach(pthread_self());
 
 	return NULL;
@@ -548,7 +568,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	printf("=== WELCOME TO THE CHATROOM ===\n");
+	printf("*** WELCOME TO TEC CHAT ***\n");
 
 	while (1)
 	{

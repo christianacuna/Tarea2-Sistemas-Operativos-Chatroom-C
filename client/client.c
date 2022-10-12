@@ -83,7 +83,7 @@ void userInputHandler(char *input, int length)
 void sendMsgHandler()
 {
 	char message[MSG_LENGTH];
-	printf("Please input a group id or user name:\n");
+	printf("Please input a message to send:\n");
 	userInputHandler(message, MSG_LENGTH);
 	sendMsg(name, message, MSG_LENGTH, sockfd);
 	bzero(message, MSG_LENGTH);
@@ -190,7 +190,7 @@ void userCmdHandler()
 void receiveMsgHandler()
 {
 	char message[MSG_LENGTH];
-	while (flag)
+	while (1)
 	{
 		int receive = recv(sockfd, message, MSG_LENGTH, 0);
 		if (receive > 0)
@@ -200,11 +200,14 @@ void receiveMsgHandler()
 		}
 		else if (receive == 0)
 		{
+			console.error("Connection Timed out");
+			memset(message, 0, sizeof(message));
 			break;
 		}
 		else
 		{
 			// -1
+			console.error("Unknown Server Respone Exception");
 		}
 		memset(message, 0, sizeof(message));
 	}
@@ -348,7 +351,6 @@ int main(int argc, char **argv)
 			break;
 		}
 	}
-	printf("TEST 9");
 	close(sockfd);
 
 	return EXIT_SUCCESS;
